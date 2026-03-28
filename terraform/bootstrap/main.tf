@@ -1,22 +1,22 @@
 data "aws_caller_identity" "current" {}
 
-############################
-# S3 bucket for tfstate
-############################
-resource "aws_s3_bucket" "terraform_state" {
+# tfstate 파일 저장을 위한 S3 bucket 구성
+resource "aws_s3_bucket" "state_bucket" {
   bucket = var.terraform_state_bucket_name
 }
 
-resource "aws_s3_bucket_versioning" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+# 상태 파일 덮어쓰기 방지
+resource "aws_s3_bucket_versioning" "state_versioning" {
+  bucket = aws_s3_bucket.state_bucket.id
 
   versioning_configuration {
     status = "Enabled"
   }
-}
+} 
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+# 상태 파일 암호화
+resource "aws_s3_bucket_server_side_encryption_configuration" "state_encryption" {
+  bucket = aws_s3_bucket.state_bucket.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -25,8 +25,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+# S3 버킷 접근 차단
+resource "aws_s3_bucket_public_access_block" "state_access_block" {
+  bucket = aws_s3_bucket.state_bucket.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -34,12 +35,10 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
   restrict_public_buckets = true
 }
 
-############################
-# DynamoDB table for locking
-############################
+# 락을 위한 DynamoDB 테이블 생성
 resource "aws_dynamodb_table" "terraform_lock" {
   name         = var.terraform_lock_table_name
-  billing_mode = "PAY_PER_REQUEST"
+  billing_mode = "PAY_PER_REQUEST" # On-Demand 청구
   hash_key     = "LockID"
 
   attribute {
@@ -48,24 +47,20 @@ resource "aws_dynamodb_table" "terraform_lock" {
   }
 }
 
-############################
-# GitHub OIDC provider
-############################
+# GitHub Actions를 위한 OIDC 인증 (변경금지)
 resource "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+  url = "https://token.actions.githubusercontent.com" # OIDC 공식주소
 
   client_id_list = [
     "sts.amazonaws.com"
   ]
 
   thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1"
+    "6938fd4d98bab03faadb97b34396831e3780aea1" # SSL 인증서지문
   ]
 }
 
-############################
 # IAM trust policy for GitHub Actions
-############################
 data "aws_iam_policy_document" "github_actions_assume_role" {
   statement {
     effect = "Allow"
@@ -100,22 +95,20 @@ resource "aws_iam_role" "github_actions" {
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
 }
 
-############################
-# IAM policy for Terraform from GitHub Actions
-############################
+# Github Actions을 Terraform에서 사용하기 위한 IAM 정책
 data "aws_iam_policy_document" "github_actions_terraform" {
   statement {
-    sid    = "AllowStateBucketAccess"
+    sid    = "AllowStateBucketAccess" # 임의의 상태 ID
     effect = "Allow"
 
     actions = [
-      "s3:ListBucket",
-      "s3:GetBucketVersioning"
+      "s3:ListBucket", # 버킷 안 조회
+      "s3:GetBucketVersioning" # 버저닝 활성화 여부 조회
     ]
 
     resources = [
-      aws_s3_bucket.terraform_state.arn
-    ]
+      aws_s3_bucket.state_bucket.arn
+    ] # 상태 파일 리소스 주소를 대상으로 지정
   }
 
   statement {
@@ -123,13 +116,13 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     effect = "Allow"
 
     actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-      "s3:DeleteObject"
+      "s3:GetObject", # 상태 파일 읽기
+      "s3:PutObject", # 상태 파일 생성
+      "s3:DeleteObject" # 상태 파일 제거
     ]
 
     resources = [
-      "${aws_s3_bucket.terraform_state.arn}/*"
+      "${aws_s3_bucket.state_bucket.arn}/*" # 버킷 안의 모든 파일을 의미
     ]
   }
 
@@ -138,10 +131,10 @@ data "aws_iam_policy_document" "github_actions_terraform" {
     effect = "Allow"
 
     actions = [
-      "dynamodb:DescribeTable",
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:DeleteItem"
+      "dynamodb:DescribeTable", # 테이블을 조회
+      "dynamodb:GetItem", # 락 상태 조회
+      "dynamodb:PutItem", # 락을 생성하여 하나의 트랜잭션만 허용
+      "dynamodb:DeleteItem" # 락을 제거하여 트랜잭션 완료 처리
     ]
 
     resources = [
@@ -174,11 +167,13 @@ data "aws_iam_policy_document" "github_actions_terraform" {
   }
 }
 
+# aws에 github actions을 위한 실제 정책 리스트를 생성
 resource "aws_iam_policy" "github_actions_terraform" {
   name   = "${var.project_name}-${var.environment}-github-actions-terraform-policy"
   policy = data.aws_iam_policy_document.github_actions_terraform.json
 }
 
+# 생성한 정책 리스트에 만든 IAM 정책들을 연결
 resource "aws_iam_role_policy_attachment" "github_actions_terraform" {
   role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_actions_terraform.arn
