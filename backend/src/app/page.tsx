@@ -20,6 +20,7 @@ export default function HomePage() {
             <p className="text-slate-400">실시간 데이터 트래킹</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button onClick={() => router.push('/dashboard')} className="rounded-lg border border-slate-600 px-6 py-3 font-semibold text-slate-200 transition hover:bg-slate-800">대시보드</button>
             <button onClick={() => router.push('/room')} className="rounded-lg bg-cyan-600 px-6 py-3 font-semibold shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-500 hover:shadow-cyan-400/40">화상 집중방</button>
             <button onClick={() => router.push('/tracker')} className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 font-semibold shadow-lg shadow-blue-500/20 transition hover:shadow-lg hover:shadow-blue-400/40">⌚ Apple Watch 연동</button>
           </div>
