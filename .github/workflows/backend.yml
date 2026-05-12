@@ -25,8 +25,8 @@ env:
 
 jobs:
   deploy:
-    name: Build Push Deploy
-    runs-on: ubuntu-latest
+    name: Build → Push → Deploy
+    runs-on: ubuntu-24.04-arm   # ★ 네이티브 ARM64 러너
 
     steps:
       - name: Checkout
@@ -38,17 +38,14 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # ❌ QEMU 제거 (네이티브 ARM이라 불필요)
+      # ❌ Buildx도 제거 가능 (기본 docker build로 충분)
 
       - name: Log in to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image (ARM64)
+      - name: Docker 빌드 + ECR 푸시 (네이티브 ARM64)
         id: build
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
@@ -56,12 +53,12 @@ jobs:
         run: |
           set -e
           IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY
-          docker buildx build \
-            --platform linux/arm64 \
+          docker build \
             -t $IMAGE:$IMAGE_TAG \
             -t $IMAGE:latest \
-            --push \
             ./backend
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
           echo "image=$IMAGE:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Download current task definition
@@ -71,7 +68,7 @@ jobs:
             --query taskDefinition \
             > taskdef.json
 
-      - name: Render updated task definition
+      - name: 새 Task Definition 렌더링 (이미지 + 환경변수)
         id: render
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
