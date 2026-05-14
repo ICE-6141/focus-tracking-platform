@@ -1,0 +1,92 @@
+name: Deploy ML Service
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'ml-service/**'
+      - '.github/workflows/ml-service.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: focus-tracking-platform-ml-service-repo
+  
+jobs:
+  deploy:
+    name: Build → Push → Deploy
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker 빌드 + ECR 푸시 (네이티브 ARM64)
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -e
+          IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY
+          docker build \
+            -t $IMAGE:$IMAGE_TAG \
+            -t $IMAGE:latest \
+            ./ml-service
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
+          echo "image=$IMAGE:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to ML EC2 via SSM
+        run: |
+          COMPOSE_B64=$(base64 -w 0 ml-service/docker-compose.yml)
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ vars.ML_EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ML Service with Redis" \
+            --parameters "commands=[
+              \"set -e\",
+              \"if ! command -v aws >/dev/null 2>&1; then apt-get update -y && apt-get install -y awscli; fi\",
+              \"mkdir -p /opt/ml-service\",
+              \"echo $COMPOSE_B64 | base64 -d > /opt/ml-service/docker-compose.yml\",
+              \"echo ENVIRONMENT=dev > /opt/ml-service/.env\",
+              \"echo REDIS_HOST=redis >> /opt/ml-service/.env\",
+              \"echo REDIS_PORT=6379 >> /opt/ml-service/.env\",
+              \"cd /opt/ml-service\",
+              \"aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.ecr.outputs.registry }}\",
+              \"docker pull ${{ steps.build.outputs.image }}\",
+              \"ML_SERVICE_IMAGE=${{ steps.build.outputs.image }} docker compose -f docker-compose.yml up -d\",
+              \"docker image prune -f\"
+            ]" \
+            --region "${{ env.AWS_REGION }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ vars.ML_EC2_INSTANCE_ID }}" \
+            --region "${{ env.AWS_REGION }}" || true
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ vars.ML_EC2_INSTANCE_ID }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json
