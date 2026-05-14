@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import WebcamView from '../components/WebcamView';
 import { GazeCalibrationOverlay } from '@/components/GazeCalibrationOverlay';
@@ -7,11 +8,25 @@ import GazeDot from '../components/GazeDot';
 import { StatusCard } from '../components/StatusCard';
 import { MinuteHeartRateAverageBox } from '@/components/MinuteHeartRateAverageBox';
 import { useConcentrationData } from '@/hooks/useConcentrationData';
+import { useTrackingAnalysisJob } from '@/hooks/useTrackingAnalysisJob';
 import { useMinuteHeartRateAverages } from '@/hooks/useMinuteHeartRateAverages';
+import { useTrackingStreamPublisher } from '@/hooks/useTrackingStreamPublisher';
+
+function makeTrackingId(prefix: string) {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
 export default function HomePage() {
   const router = useRouter();
+  const createTrackingAnalysisJob = useTrackingAnalysisJob();
+  const [isFinishing, setIsFinishing] = useState(false);
+  const soloMeetingId = useMemo(() => makeTrackingId('solo'), []);
+  const soloUserId = useMemo(() => makeTrackingId('user'), []);
   const {
+    coordinates,
     rawCoordinates,
     isLoaded,
     isCalibrated,
@@ -32,6 +47,43 @@ export default function HomePage() {
   const minuteHeartRateAverages = useMinuteHeartRateAverages(heartRate, heartRate > 0 || isHeartRateMeasuring);
   const focusDisplayScore = focusRawScore != null ? focusRawScore.toFixed(3) : '--';
   const focusThreshold = focusMetrics?.thresholdRawScore;
+
+  const { stopPublishing } = useTrackingStreamPublisher({
+    enabled: isLoaded,
+    data: {
+      meetingId: soloMeetingId,
+      userId: soloUserId,
+      heartRate,
+      heartRateSource,
+      heartRateStatus,
+      gazeX: coordinates.x,
+      gazeY: coordinates.y,
+      rawGazeX: rawCoordinates.x,
+      rawGazeY: rawCoordinates.y,
+      isGazeCalibrated: isCalibrated,
+      focusScore: focusRawScore ?? undefined,
+      page: 'solo',
+    },
+  });
+
+  const finishSession = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+    stopPublishing();
+
+    try {
+      const jobId = await createTrackingAnalysisJob({
+        meetingId: soloMeetingId,
+        userId: soloUserId,
+        page: 'solo',
+        reason: 'finish',
+      });
+      router.push(`/result?jobId=${encodeURIComponent(jobId)}`);
+    } catch (error) {
+      console.error('Tracking analysis job creation failed:', error);
+      router.push('/result');
+    }
+  };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white">
@@ -103,10 +155,11 @@ export default function HomePage() {
             />
 
             <button
-              onClick={() => router.push('/result')}
-              className="w-full rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold shadow-lg shadow-cyan-500/20 transition hover:shadow-lg hover:shadow-cyan-400/40"
+              onClick={() => void finishSession()}
+              disabled={isFinishing}
+              className="w-full rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-3 font-semibold shadow-lg shadow-cyan-500/20 transition hover:shadow-lg hover:shadow-cyan-400/40 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              View Results
+              {isFinishing ? 'Analyzing...' : 'View Results'}
             </button>
           </aside>
         </div>
