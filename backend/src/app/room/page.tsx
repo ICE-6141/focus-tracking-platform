@@ -7,6 +7,8 @@ import GazeDot from '@/components/GazeDot';
 import { MinuteHeartRateAverageBox } from '@/components/MinuteHeartRateAverageBox';
 import { useConcentrationData } from '@/hooks/useConcentrationData';
 import { useMinuteHeartRateAverages } from '@/hooks/useMinuteHeartRateAverages';
+import { useTrackingAnalysisJob } from '@/hooks/useTrackingAnalysisJob';
+import { useTrackingStreamPublisher } from '@/hooks/useTrackingStreamPublisher';
 import { useVideoRoom } from '@/hooks/useVideoRoom';
 import { FocusMetrics, RoomParticipant } from '@/types/tracker';
 
@@ -99,7 +101,9 @@ function ParticipantMetric({ participant, isMe }: { participant: RoomParticipant
 
 export default function VideoRoomPage() {
   const router = useRouter();
+  const createTrackingAnalysisJob = useTrackingAnalysisJob();
   const [name, setName] = useState('');
+  const [isLeaving, setIsLeaving] = useState(false);
   const defaultNameRef = useRef(`사용자-${Math.floor(Math.random() * 900 + 100)}`);
   const displayName = name.trim() || defaultNameRef.current;
   const {
@@ -146,6 +150,51 @@ export default function VideoRoomPage() {
     metrics,
   });
 
+  const { stopPublishing } = useTrackingStreamPublisher({
+    enabled: !!room?.roomId,
+    data: {
+      meetingId: room?.roomId ?? '',
+      userId: clientId,
+      heartRate,
+      heartRateSource,
+      heartRateStatus,
+      gazeX: coordinates.x,
+      gazeY: coordinates.y,
+      rawGazeX: rawCoordinates.x,
+      rawGazeY: rawCoordinates.y,
+      isGazeCalibrated: isCalibrated,
+      focusScore,
+      page: 'room',
+    },
+  });
+
+  const leaveAndAnalyze = async () => {
+    if (isLeaving) return;
+
+    const currentRoomId = room?.roomId;
+    setIsLeaving(true);
+    stopPublishing();
+
+    try {
+      let jobId: string | null = null;
+      if (currentRoomId) {
+        jobId = await createTrackingAnalysisJob({
+          meetingId: currentRoomId,
+          userId: clientId,
+          page: 'room',
+          reason: 'leave',
+        });
+      }
+
+      await leaveRoom();
+      router.push(jobId ? `/result?jobId=${encodeURIComponent(jobId)}` : '/result');
+    } catch (error) {
+      console.error('Room leave analysis flow failed:', error);
+      await leaveRoom().catch(() => undefined);
+      router.push('/result');
+    }
+  };
+
   const participants = room?.participants ?? [];
   const me = participants.find((participant) => participant.id === clientId);
   const remoteSlots = remoteVideos.map((remote) => {
@@ -186,13 +235,11 @@ export default function VideoRoomPage() {
               {isVideoEnabled ? '카메라 끄기' : '카메라 켜기'}
             </button>
             <button
-              onClick={async () => {
-                await leaveRoom();
-                router.push('/');
-              }}
+              onClick={() => void leaveAndAnalyze()}
+              disabled={isLeaving}
               className="h-10 rounded-md border border-rose-500/50 px-4 text-sm font-semibold text-rose-100 transition hover:border-rose-400 hover:bg-rose-500/10"
             >
-              나가기
+              {isLeaving ? '분석 중' : '나가기'}
             </button>
           </div>
         </header>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { StudySessionRecord } from '@/types/dashboard';
 
 const STORAGE_KEY = 'focusTracker.sessions';
@@ -9,11 +9,20 @@ const STORAGE_KEY = 'focusTracker.sessions';
 function ResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const jobId = searchParams.get('jobId');
+  const [jobStatus, setJobStatus] = useState<'queued' | 'processing' | 'completed' | 'failed' | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
+  const [jobResult, setJobResult] = useState<{
+    durationSeconds?: number;
+    avgBpm?: number;
+    focusRatio?: number;
+    summary?: string;
+  } | null>(null);
   
   // URL에서 데이터 추출
-  const avgBpm = parseInt(searchParams.get('avgBpm') || '0');
-  const focusRatio = parseInt(searchParams.get('focusRatio') || '0');
-  const time = parseInt(searchParams.get('time') || '0');
+  const avgBpm = jobResult?.avgBpm ?? parseInt(searchParams.get('avgBpm') || '0');
+  const focusRatio = jobResult?.focusRatio ?? parseInt(searchParams.get('focusRatio') || '0');
+  const time = jobResult?.durationSeconds ?? parseInt(searchParams.get('time') || '0');
 
   // 데이터 계산
   const minutes = Math.floor(time / 60);
@@ -22,6 +31,47 @@ function ResultContent() {
   const bpmStatus = avgBpm < 60 ? '낮음' : avgBpm > 100 ? '높음' : '정상';
   const bpmStatusColor = avgBpm < 60 ? 'text-blue-400' : avgBpm > 100 ? 'text-red-400' : 'text-emerald-400';
   const sessionId = `${time}-${focusRatio}-${avgBpm}`;
+  const isWaitingForJob = !!jobId && jobStatus !== 'completed' && jobStatus !== 'failed';
+
+  useEffect(() => {
+    if (!jobId) return undefined;
+
+    let cancelled = false;
+    const loadStatus = async () => {
+      try {
+        const response = await fetch(`/api/tracking/jobs/${encodeURIComponent(jobId)}`);
+        const payload = await response.json().catch(() => null) as {
+          status?: 'queued' | 'processing' | 'completed' | 'failed';
+          result?: typeof jobResult;
+          error?: string;
+        } | null;
+
+        if (cancelled) return;
+
+        if (!response.ok || !payload?.status) {
+          setJobStatus('failed');
+          setJobError(payload?.error ?? '분석 작업 상태를 확인하지 못했습니다.');
+          return;
+        }
+
+        setJobStatus(payload.status);
+        setJobError(payload.error ?? null);
+        if (payload.result) setJobResult(payload.result);
+      } catch (error) {
+        if (!cancelled) {
+          setJobStatus('failed');
+          setJobError(error instanceof Error ? error.message : '분석 작업 상태를 확인하지 못했습니다.');
+        }
+      }
+    };
+
+    void loadStatus();
+    const interval = window.setInterval(loadStatus, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [jobId]);
 
   useEffect(() => {
     if (time <= 0 && focusRatio <= 0 && avgBpm <= 0) return;
@@ -69,6 +119,40 @@ function ResultContent() {
 
       {/* 메인 컨텐츠 */}
       <div className="mx-auto max-w-7xl px-6 py-12">
+        {jobId && (
+          <div className={`mb-8 rounded-2xl p-6 ring-1 backdrop-blur-sm ${
+            jobStatus === 'failed'
+              ? 'bg-rose-950/40 ring-rose-500/30'
+              : jobStatus === 'completed'
+                ? 'bg-emerald-950/30 ring-emerald-500/30'
+                : 'bg-slate-900/80 ring-cyan-500/20'
+          }`}>
+            <p className="text-sm font-semibold text-slate-200">
+              {jobStatus === 'completed'
+                ? '분석 완료'
+                : jobStatus === 'failed'
+                  ? '분석 작업 확인 실패'
+                  : '분석 중'}
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              {jobStatus === 'completed'
+                ? 'Redis 분석 결과를 불러왔습니다.'
+                : jobStatus === 'failed'
+                  ? jobError
+                  : `작업 ID ${jobId} 상태를 확인하는 중입니다.`}
+            </p>
+          </div>
+        )}
+
+        {isWaitingForJob && (
+          <div className="rounded-2xl bg-slate-900/70 p-10 text-center ring-1 ring-slate-600/50">
+            <p className="text-2xl font-bold text-white">학습 데이터를 분석하고 있습니다.</p>
+            <p className="mt-3 text-sm text-slate-400">Redis에 등록된 job이 완료되면 결과가 여기에 표시됩니다.</p>
+          </div>
+        )}
+
+        {!isWaitingForJob && (
+          <>
         {/* 핵심 지표 3개 */}
         <div className="mb-12 grid gap-6 lg:grid-cols-3">
           {/* 학습 시간 */}
@@ -244,6 +328,8 @@ function ResultContent() {
             새 세션 시작
           </button>
         </div>
+          </>
+        )}
       </div>
     </main>
   );
