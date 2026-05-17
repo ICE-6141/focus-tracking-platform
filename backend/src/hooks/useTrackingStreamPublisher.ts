@@ -14,6 +14,10 @@ interface TrackingStreamData {
   rawGazeY?: number;
   isGazeCalibrated: boolean;
   focusScore?: number;
+  focusIsFocused?: boolean | null;
+  focusThresholdRawScore?: number | null;
+  rPPG?: number | null;
+  threshold?: number | null;
   page: 'solo' | 'room';
 }
 
@@ -76,6 +80,10 @@ export function useTrackingStreamPublisher({ enabled = true, data }: UseTracking
               calibrated: latest.isGazeCalibrated,
             },
             focusScore: latest.focusScore,
+            focusIsFocused: latest.focusIsFocused,
+            focusThresholdRawScore: latest.focusThresholdRawScore,
+            rPPG: latest.rPPG,
+            threshold: latest.threshold,
             page: latest.page,
           }),
           keepalive: true,
