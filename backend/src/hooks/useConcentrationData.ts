@@ -1,25 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useWebGazer } from '../hooks/useWebGazer';
-import { useRPPG } from '../hooks/useRPPG';
+import { isRppgMeasuringStatus, useRPPG } from '../hooks/useRPPG';
 import { useRollingHeartRateAverage } from '../hooks/useRollingHeartRateAverage';
 import { useRollingGazeAverage } from '../hooks/useRollingGazeAverage';
-
-function isMeasuringStatus(status: string) {
-  return [
-    'Preparing',
-    'Collecting',
-    'Calibrating',
-    'Measuring',
-    'Motion detected',
-    '준비',
-    '수집',
-    '측정',
-    '프레임',
-    '보정',
-    '움직임',
-    '유지',
-  ].some((needle) => status.includes(needle));
-}
 
 export function useConcentrationData() {
   const {
@@ -131,7 +114,7 @@ export function useConcentrationData() {
   const heartRate = useRollingHeartRateAverage(rawHeartRate, rawHeartRate > 0, 10, heartRateSource);
   const hasGaze = isCalibrated && rawCoordinates.x > 0 && rawCoordinates.y > 0;
   const hasHeartRate = rawHeartRate >= 40 && rawHeartRate <= 180;
-  const isHeartRateMeasuring = phoneBpm <= 0 && !webcamBpmError && isMeasuringStatus(webcamBpmStatus);
+  const isHeartRateMeasuring = phoneBpm <= 0 && !webcamBpmError && isRppgMeasuringStatus(webcamBpmStatus);
   const heartRateStatus = phoneBpm > 0
     ? '감지됨'
     : hasHeartRate

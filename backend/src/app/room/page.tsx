@@ -122,6 +122,7 @@ export default function VideoRoomPage() {
     heartRateSource,
     heartRateStatus,
     focusScore,
+    focusRawScore,
     focusIsFocused,
     focusThresholdRawScore,
   } = useConcentrationData();
@@ -166,7 +167,7 @@ export default function VideoRoomPage() {
       rawGazeX: rawCoordinates.x,
       rawGazeY: rawCoordinates.y,
       isGazeCalibrated: isCalibrated,
-      focusScore,
+      focusScore: focusRawScore ?? undefined,
       focusIsFocused,
       focusThresholdRawScore,
       page: 'room',
