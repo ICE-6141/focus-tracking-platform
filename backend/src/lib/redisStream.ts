@@ -274,6 +274,8 @@ export interface TrackingAnalysisJobStatus {
     avgBpm?: number;
     focusRatio?: number;
     summary?: string;
+    feedback?: string;
+    feedbackSource?: string;
   };
   error?: string;
 }
@@ -288,6 +290,8 @@ interface MlAnalyzeResponse {
     heartRate_mean?: number | null;
     [key: string]: unknown;
   }>;
+  feedback?: string | null;
+  feedback_source?: string | null;
 }
 
 function makeJobId() {
@@ -407,6 +411,8 @@ function mapMlAnalyzeResult(payload: MlAnalyzeResponse | null): NonNullable<Trac
     avgBpm,
     focusRatio,
     summary,
+    feedback: typeof payload?.feedback === 'string' ? payload.feedback : undefined,
+    feedbackSource: typeof payload?.feedback_source === 'string' ? payload.feedback_source : undefined,
   };
 }
 
