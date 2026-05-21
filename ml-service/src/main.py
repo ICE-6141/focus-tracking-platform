@@ -114,12 +114,19 @@ class AnalysisSummary(BaseModel):
     avg_gaze_missing_rate: float
 
 
+class ResultMetrics(BaseModel):
+    duration_seconds: int
+    avg_bpm: Optional[int] = None
+    focus_ratio: Optional[int] = None
+
+
 class AnalyzeResponse(BaseModel):
     userId: str
     sessionId: str
     duration_minutes: int
     summary: AnalysisSummary
     minutes: list[MinuteAnalysis]
+    result_metrics: ResultMetrics
     feedback: Optional[str] = None
     feedback_source: Optional[str] = None
 

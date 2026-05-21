@@ -79,3 +79,8 @@ BEDROCK_MAX_ATTEMPTS = _get_int_env("BEDROCK_MAX_ATTEMPTS", 2)
 def session_records_key(user_id: str, session_id: str) -> str:
     """Node.js가 초 단위 기록을 RPUSH해야 하는 Redis 리스트 키."""
     return f"study:session:{user_id}:{session_id}:records"
+
+
+def tracking_stream_key(user_id: str, session_id: str) -> str:
+    """Next.js 백엔드가 초 단위 기록을 XADD하는 Redis Stream 키."""
+    return f"tracking:{session_id}:{user_id}:stream"
