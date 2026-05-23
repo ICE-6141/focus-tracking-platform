@@ -92,16 +92,6 @@ resource "aws_security_group_rule" "web_ingress_from_alb" {
   description              = "Allow inbound traffic from ALB on port 3000"
 }
 
-resource "aws_security_group_rule" "web_ingress_from_ml" {
-  type                     = "ingress"
-  from_port                = 3000
-  to_port                  = 3000
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.ml_sg.id
-  security_group_id        = aws_security_group.web_sg.id
-  description              = "Allow inbound traffic from ML service on port 3000"
-}
-
 resource "aws_security_group_rule" "web_egress_all" {
   type              = "egress"
   from_port         = 0
@@ -115,22 +105,12 @@ resource "aws_security_group_rule" "web_egress_all" {
 # 3. Data EC2 Rules
 resource "aws_security_group_rule" "data_ingress_from_web" {
   type                     = "ingress"
-  from_port                = 3306
-  to_port                  = 3306
+  from_port                = 5432
+  to_port                  = 5432
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.web_sg.id
   security_group_id        = aws_security_group.db_sg.id
   description              = "Allow MySQL access from web EC2"
-}
-
-resource "aws_security_group_rule" "data_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.db_sg.id
-  description       = "Allow all outbound traffic from DB EC2 (updates, patches)"
 }
 
 # 4. ML EC2 Rules

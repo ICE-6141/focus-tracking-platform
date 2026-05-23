@@ -120,6 +120,23 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_standard" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy" "ecs_task_execution_postgres_secret" {
+  name = "${var.project_name}-${var.environment}-postgres-secret-read"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "AllowReadPostgresMasterSecret"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = try(aws_db_instance.postgres.master_user_secret[0].secret_arn, "*")
+      }
+    ]
+  })
+}
+
 ####################
 ### ECS 태스크 역할 ###
 ####################
