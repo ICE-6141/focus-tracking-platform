@@ -62,7 +62,7 @@ variable "app_port" {
 
 variable "db_port" {
   type    = number
-  default = 3306
+  default = 5432
 }
 
 variable "ml_port" {
@@ -107,4 +107,33 @@ variable "datadog_aws_account_id" {
   description = "AWS account ID to connect to Datadog"
   type        = string
   default     = "058264452543"
+}
+
+variable "postgres_db_name" {
+  description = "Initial PostgreSQL database name."
+  type        = string
+  default     = "focus_tracking_database"
+}
+
+variable "postgres_master_username" {
+  description = "PostgreSQL master username. The password is managed by RDS in Secrets Manager."
+  type        = string
+}
+
+variable "postgres_instance_class" {
+  description = "RDS PostgreSQL instance class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "postgres_allocated_storage" {
+  description = "Initial RDS PostgreSQL storage size in GiB."
+  type        = number
+  default     = 20
+}
+
+variable "postgres_backup_retention_days" {
+  description = "RDS PostgreSQL automated backup retention period in days."
+  type        = number
+  default     = 7
 }

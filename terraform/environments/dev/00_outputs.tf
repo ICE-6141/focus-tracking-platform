@@ -34,24 +34,23 @@ output "s3_endpoint_id" {
   value = aws_vpc_endpoint.s3.id
 }
 
-/*
-output "cloudfront_distribution_id" {
-  description = "CloudFront Distribution ID"
-  value       = aws_cloudfront_distribution.this.id
+output "postgres_endpoint" {
+  description = "PostgreSQL RDS endpoint."
+  value       = aws_db_instance.postgres.endpoint
 }
 
-output "cloudfront_distribution_arn" {
-  description = "CloudFront Distribution ARN"
-  value       = aws_cloudfront_distribution.this.arn
+output "postgres_address" {
+  description = "PostgreSQL RDS hostname."
+  value       = aws_db_instance.postgres.address
 }
 
-output "cloudfront_domain_name" {
-  description = "CloudFront Distribution Domain Name"
-  value       = aws_cloudfront_distribution.this.domain_name
+output "postgres_port" {
+  description = "PostgreSQL RDS port."
+  value       = aws_db_instance.postgres.port
 }
 
-output "cloudfront_hosted_zone_id" {
-  description = "CloudFront Distribution Hosted Zone ID (Route53 Alias용)"
-  value       = aws_cloudfront_distribution.this.hosted_zone_id
+output "postgres_master_user_secret_arn" {
+  description = "Secrets Manager secret ARN for the RDS-managed PostgreSQL master password."
+  value       = try(aws_db_instance.postgres.master_user_secret[0].secret_arn, null)
+  sensitive   = true
 }
-이건 나중에 다시*/ 

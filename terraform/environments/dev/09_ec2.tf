@@ -22,12 +22,12 @@ data "aws_ami" "ubuntu_2204_arm64" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"] 
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-arm64-server-*"]
   }
 
   filter {
     name   = "architecture"
-    values = ["arm64"] 
+    values = ["arm64"]
   }
 }
 
@@ -44,9 +44,6 @@ data "aws_ssm_parameter" "ecs_ami_arm" {
 ###############
 ### EC2 생성 ###
 ###############
-
-
-
 # ====================================================
 # 1. 앱 서버 (Web EC2) — ASG 기반으로 이관됨
 # ====================================================
@@ -56,39 +53,7 @@ data "aws_ssm_parameter" "ecs_ami_arm" {
 # ====================================================
 
 
-
-# 2. DB 서버 (DB EC2)
-resource "aws_instance" "db_ec2" {
-  ami                    = data.aws_ami.ubuntu_2204_x86.id
-  instance_type          = "t3.micro"
-  subnet_id              = aws_subnet.private_db_a.id
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
-
-  root_block_device {
-    volume_size           = 30
-    volume_type           = "gp3"
-    delete_on_termination = true
-    encrypted             = true
-  }
-
-  # ★ 추가: IMDSv2 강제 (CKV_AWS_79)
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 1
-  }
-
-  # DB 전용 프로파일 연결
-  iam_instance_profile = aws_iam_instance_profile.db_ec2_profile.name
-  associate_public_ip_address = false
-
-  tags = {
-    Name        = "db-ec2"
-    Environment = var.environment
-  }
-}
-
-# 3. ML 서버 (ML EC2)
+# 2. ML 서버 (ML EC2)
 resource "aws_instance" "ml_ec2" {
   ami                    = data.aws_ami.ubuntu_2204_arm64.id
   instance_type          = "t4g.small"
@@ -107,9 +72,9 @@ resource "aws_instance" "ml_ec2" {
     http_endpoint               = "enabled"
     http_put_response_hop_limit = 2
   }
-  
+
   # ML 전용 프로파일 연결
-  iam_instance_profile = aws_iam_instance_profile.ml_ec2_profile.name
+  iam_instance_profile        = aws_iam_instance_profile.ml_ec2_profile.name
   associate_public_ip_address = false
 
   tags = {

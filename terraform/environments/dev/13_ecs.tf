@@ -26,7 +26,7 @@ resource "aws_ecs_cluster" "main" {
 # Task Definition에서 이 log group을 지정하면 자동으로 로그가 모임
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/${var.project_name}-${var.environment}"
-  retention_in_days = 14   # 14일 후 자동 삭제 (비용 절약)
+  retention_in_days = 14 # 14일 후 자동 삭제 (비용 절약)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-log-group"
@@ -53,8 +53,8 @@ resource "aws_ecs_task_definition" "app" {
   # cpu=1024: 1 EC2(2 vCPU)에 Task 2개 적재 시 CPU 100% 활용
   # memory=1536: Task 2개 합 3072 MB, t4g.medium 가용 ~3700 MB 중 헤드룸 ~630 MB 확보
   # Task 1개 단독 실행 시엔 cpu가 소프트 리밋이라 burst로 2 vCPU까지 활용 가능
-  cpu    = "1024"   # 1 vCPU
-  memory = "1536"   # 1.5 GB
+  cpu    = "1024" # 1 vCPU
+  memory = "1536" # 1.5 GB
 
   # 컨테이너 실행 역할: ECR에서 이미지 pull + CloudWatch 로그 전송에 사용
   execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
@@ -67,13 +67,13 @@ resource "aws_ecs_task_definition" "app" {
     {
       name      = "app"
       image     = "${aws_ecr_repository.app.repository_url}:latest"
-      essential = true    # 이 컨테이너가 죽으면 task 전체 재시작
+      essential = true # 이 컨테이너가 죽으면 task 전체 재시작
 
       # 포트 매핑: awsvpc 모드에서는 containerPort 만 지정 (hostPort 불필요)
       # 각 task가 고유 IP를 가지므로 호스트 포트 개념이 없음
       portMappings = [
         {
-          containerPort = var.app_port    # 3000 (컨테이너 내부에서 앱이 쓰는 포트)
+          containerPort = var.app_port # 3000 (컨테이너 내부에서 앱이 쓰는 포트)
           protocol      = "tcp"
         }
       ]
@@ -81,7 +81,15 @@ resource "aws_ecs_task_definition" "app" {
       # 환경변수 (앱이 읽어서 동작 모드 결정)
       environment = [
         { name = "NODE_ENV", value = var.environment },
-        { name = "PORT",     value = tostring(var.app_port) }
+        { name = "PORT", value = tostring(var.app_port) },
+        { name = "DB_HOST", value = aws_db_instance.postgres.address },
+        { name = "DB_PORT", value = tostring(aws_db_instance.postgres.port) },
+        { name = "DB_NAME", value = var.postgres_db_name },
+        { name = "DB_USER", value = var.postgres_master_username }
+      ]
+
+      secrets = [
+        { name = "DB_PASSWORD", valueFrom = "${aws_db_instance.postgres.master_user_secret[0].secret_arn}:password::" }
       ]
 
       # 로그를 CloudWatch로 전송하는 설정
@@ -96,7 +104,7 @@ resource "aws_ecs_task_definition" "app" {
     }
   ])
 
-    # ★ CI/CD가 새 이미지로 task definition revision을 등록할 때
+  # ★ CI/CD가 새 이미지로 task definition revision을 등록할 때
   #   Terraform이 다시 :latest로 되돌리지 않게 무시
   lifecycle {
     ignore_changes = [container_definitions]
@@ -118,14 +126,14 @@ resource "aws_ecs_service" "app" {
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
 
-  desired_count   = 1          # 평상시 1개 유지 (Auto Scaling으로 부하 시 2개까지 확장)
+  desired_count = 1 # 평상시 1개 유지 (Auto Scaling으로 부하 시 2개까지 확장)
 
   # ★ launch_type 대신 Capacity Provider 사용 (24_capacity_provider.tf 참조)
   # 이 전략을 통해 ECS가 ASG에 "EC2 더 필요해" 신호를 보낼 수 있게 됨
   capacity_provider_strategy {
     capacity_provider = aws_ecs_capacity_provider.app.name
-    weight            = 100   # 100% 이 Provider로 배치
-    base              = 1     # 최소 1개 Task는 무조건 이 Provider에
+    weight            = 100 # 100% 이 Provider로 배치
+    base              = 1   # 최소 1개 Task는 무조건 이 Provider에
   }
 
   # ★ Blue/Green 배포 하려면 반드시 CODE_DEPLOY로 설정
@@ -141,7 +149,7 @@ resource "aws_ecs_service" "app" {
       aws_subnet.private_app_c.id
     ]
     # task ENI에 붙일 SG (web_sg 재사용 - 이미 ALB→3000 ingress 있음)
-    security_groups  = [aws_security_group.web_sg.id]
+    security_groups = [aws_security_group.web_sg.id]
     # 프라이빗 서브넷이라 퍼블릭 IP 불필요
     assign_public_ip = false
   }
@@ -177,3 +185,4 @@ resource "aws_ecs_service" "app" {
     Name = "${var.project_name}-${var.environment}-svc"
   }
 }
+
