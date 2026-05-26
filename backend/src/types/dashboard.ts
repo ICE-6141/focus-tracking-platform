@@ -4,4 +4,8 @@ export interface StudySessionRecord {
   durationSeconds: number;
   focusRatio: number;
   avgBpm: number;
+  validMinutes?: number;
+  rankingScore?: number;
+  highFocusSeconds?: number;
+  rankingEligible?: boolean;
 }

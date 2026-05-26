@@ -21,6 +21,9 @@ from src.preprocessing import (
     split_into_windows,
 )
 
+RANKING_TARGET_MINUTES = 50
+RANKING_MIN_VALID_MINUTES = 10
+
 
 class SessionDataNotFoundError(ValueError):
     """요청한 세션의 기록이 Redis에 없을 때 발생하는 예외."""
@@ -150,6 +153,26 @@ def _boolean_focus_ratio(window: Any) -> float | None:
     return sum(1 for value in values if value) / len(values)
 
 
+def _boolean_high_focus_seconds(window: Any) -> int | None:
+    if "focusIsFocused" not in window.columns:
+        return None
+
+    high_focus_seconds = 0
+    known_values = 0
+    for value in window["focusIsFocused"].dropna().tolist():
+        if isinstance(value, bool):
+            known_values += 1
+            high_focus_seconds += 1 if value else 0
+        elif isinstance(value, (int, float)) and value in (0, 1):
+            known_values += 1
+            high_focus_seconds += int(value)
+
+    if known_values == 0:
+        return None
+
+    return high_focus_seconds
+
+
 def _raw_focus_score(window: Any) -> tuple[float | None, float | None]:
     if "focusScore" not in window.columns:
         return None, None
@@ -168,17 +191,24 @@ def _raw_focus_score(window: Any) -> tuple[float | None, float | None]:
     return score, threshold
 
 
+def _ranking_score(focus_ratio: int | None, valid_minutes: float) -> float | None:
+    if focus_ratio is None:
+        return None
+
+    focus_ratio_score = max(0.0, min(float(focus_ratio) / 100.0, 1.0)) * 70.0
+    duration_score = min(max(valid_minutes, 0.0) / RANKING_TARGET_MINUTES, 1.0) * 30.0
+    return round(focus_ratio_score + duration_score, 1)
+
+
 def _build_result_metrics(
     dataframe: Any,
     minutes: list[dict[str, Any]],
     summary: dict[str, Any],
-) -> dict[str, int | None]:
-    timestamps = dataframe["timestamp"].dropna()
-    if timestamps.empty:
-        duration_seconds = 0
-    else:
-        elapsed = (timestamps.iloc[-1] - timestamps.iloc[0]).total_seconds()
-        duration_seconds = max(1, int(round(elapsed)) + 1)
+) -> dict[str, int | float | bool | None]:
+    # The stream publisher writes one sample per second. After pause rows are
+    # filtered out in preprocessing, row count is the valid measurement time.
+    duration_seconds = int(dataframe.shape[0])
+    valid_minutes = round(duration_seconds / 60.0, 2)
 
     heart_values = dataframe["heartRate"].dropna()
     avg_bpm = (
@@ -202,10 +232,24 @@ def _build_result_metrics(
                 round((summary["high_focus_minutes"] / len(known_minutes)) * 100)
             )
 
+    high_focus_seconds = _boolean_high_focus_seconds(dataframe)
+    if high_focus_seconds is None:
+        high_focus_seconds = int(summary["high_focus_minutes"] * 60)
+
+    ranking_score = _ranking_score(focus_ratio, valid_minutes)
+    ranking_eligible = (
+        ranking_score is not None
+        and valid_minutes >= RANKING_MIN_VALID_MINUTES
+    )
+
     return {
         "duration_seconds": duration_seconds,
         "avg_bpm": avg_bpm,
         "focus_ratio": focus_ratio,
+        "valid_minutes": valid_minutes,
+        "ranking_score": ranking_score,
+        "high_focus_seconds": high_focus_seconds,
+        "ranking_eligible": ranking_eligible,
     }
 
 

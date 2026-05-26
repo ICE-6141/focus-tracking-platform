@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import {
   createTrackingAnalysisJob,
   setTrackingAnalysisJobStatus,
+  upsertRankingSessionEntry,
   type TrackingAnalysisJobRequest,
   type TrackingAnalysisJobStatus,
 } from '@/lib/redisStream';
+import { getSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +21,10 @@ interface MlAnalyzeResponse {
     duration_seconds?: number;
     avg_bpm?: number | null;
     focus_ratio?: number | null;
+    valid_minutes?: number | null;
+    ranking_score?: number | null;
+    high_focus_seconds?: number | null;
+    ranking_eligible?: boolean | null;
   };
   feedback?: string | null;
   feedback2?: string | null;
@@ -82,6 +88,12 @@ function buildCompletedResult(analysis: MlAnalyzeResponse): NonNullable<Tracking
     : analysis.duration_minutes * 60;
   const avgBpm = typeof metrics?.avg_bpm === 'number' ? metrics.avg_bpm : undefined;
   const focusRatio = typeof metrics?.focus_ratio === 'number' ? metrics.focus_ratio : undefined;
+  const validMinutes = typeof metrics?.valid_minutes === 'number' ? metrics.valid_minutes : undefined;
+  const rankingScore = typeof metrics?.ranking_score === 'number' ? metrics.ranking_score : undefined;
+  const highFocusSeconds = typeof metrics?.high_focus_seconds === 'number' ? metrics.high_focus_seconds : undefined;
+  const rankingEligible = typeof metrics?.ranking_eligible === 'boolean'
+    ? metrics.ranking_eligible
+    : undefined;
   const gazeHeatmap = analysis.gaze_heatmap
     ? {
       columns: analysis.gaze_heatmap.columns,
@@ -107,6 +119,10 @@ function buildCompletedResult(analysis: MlAnalyzeResponse): NonNullable<Tracking
     durationSeconds,
     avgBpm,
     focusRatio,
+    validMinutes,
+    rankingScore,
+    highFocusSeconds,
+    rankingEligible,
     summary: buildResultSummary(analysis, focusRatio),
     feedback: analysis.feedback ?? undefined,
     feedback2: analysis.feedback2 ?? undefined,
@@ -136,6 +152,46 @@ async function analyzeSession(body: TrackingAnalysisJobRequest) {
   return response.json() as Promise<MlAnalyzeResponse>;
 }
 
+async function saveRankingEntry(
+  jobId: string,
+  body: TrackingAnalysisJobRequest,
+  result: NonNullable<TrackingAnalysisJobStatus['result']>,
+) {
+  if (
+    typeof result.durationSeconds !== 'number'
+    || typeof result.validMinutes !== 'number'
+    || typeof result.focusRatio !== 'number'
+    || typeof result.rankingScore !== 'number'
+    || typeof result.highFocusSeconds !== 'number'
+  ) {
+    return;
+  }
+
+  const session = await getSession().catch(() => null);
+  const rankingUser = session?.user;
+  const userId = rankingUser?.id ?? body.userId;
+  const userName = rankingUser?.name || rankingUser?.login || body.userId;
+
+  await upsertRankingSessionEntry({
+    id: jobId,
+    jobId,
+    sessionId: body.meetingId,
+    streamUserId: body.userId,
+    userId,
+    userName,
+    userAvatarUrl: rankingUser?.avatarUrl || undefined,
+    page: body.page,
+    completedAt: new Date().toISOString(),
+    durationSeconds: result.durationSeconds,
+    validMinutes: result.validMinutes,
+    avgBpm: result.avgBpm,
+    focusRatio: result.focusRatio,
+    rankingScore: result.rankingScore,
+    highFocusSeconds: result.highFocusSeconds,
+    rankingEligible: result.rankingEligible ?? result.validMinutes >= 10,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -160,13 +216,17 @@ export async function POST(request: Request) {
 
     try {
       const analysis = await analyzeSession(body);
+      const completedResult = buildCompletedResult(analysis);
       const completedStatus: TrackingAnalysisJobStatus = {
         ...baseStatus,
         status: 'completed',
-        result: buildCompletedResult(analysis),
+        result: completedResult,
       };
 
       await setTrackingAnalysisJobStatus(completedStatus);
+      await saveRankingEntry(result.jobId, body, completedResult).catch((rankingError) => {
+        console.warn('[Tracking Ranking] ranking save failed:', rankingError);
+      });
       return NextResponse.json({ ok: true, ...result, status: completedStatus.status, result: completedStatus.result });
     } catch (analysisError) {
       const message = analysisError instanceof Error ? analysisError.message : 'tracking analysis failed';

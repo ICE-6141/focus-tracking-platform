@@ -256,6 +256,12 @@ export default function VideoRoomPage() {
               className="h-10 w-44 rounded-md border border-slate-700 bg-slate-900 px-3 text-sm text-white outline-none transition focus:border-cyan-400"
             />
             <button
+              onClick={() => router.push('/ranking')}
+              className="h-10 rounded-md border border-emerald-500/50 px-4 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+            >
+              랭킹
+            </button>
+            <button
               onClick={toggleAudio}
               className="h-10 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
             >

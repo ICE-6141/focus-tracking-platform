@@ -39,6 +39,10 @@ interface JobResult {
   durationSeconds?: number;
   avgBpm?: number;
   focusRatio?: number;
+  validMinutes?: number;
+  rankingScore?: number;
+  highFocusSeconds?: number;
+  rankingEligible?: boolean;
   summary?: string;
   feedback?: string;
   feedback2?: string;
@@ -56,6 +60,11 @@ function formatElapsed(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return rest === 0 ? `${minutes}분` : `${minutes}분 ${rest}초`;
+}
+
+function calculateRankingScore(focusRatio: number, durationSeconds: number) {
+  const validMinutes = durationSeconds / 60;
+  return Number(((Math.max(0, Math.min(focusRatio, 100)) / 100) * 70 + Math.min(validMinutes / 50, 1) * 30).toFixed(1));
 }
 
 function GazeHeatmapChart({ heatmap }: { heatmap?: GazeHeatmap }) {
@@ -281,6 +290,9 @@ function ResultContent() {
   const avgBpm = jobResult?.avgBpm ?? parseInt(searchParams.get('avgBpm') || '0');
   const focusRatio = jobResult?.focusRatio ?? parseInt(searchParams.get('focusRatio') || '0');
   const time = jobResult?.durationSeconds ?? parseInt(searchParams.get('time') || '0');
+  const rankingScore = jobResult?.rankingScore ?? calculateRankingScore(focusRatio, time);
+  const validMinutes = jobResult?.validMinutes ?? Number((time / 60).toFixed(2));
+  const rankingEligible = jobResult?.rankingEligible ?? validMinutes >= 10;
 
   // 데이터 계산
   const minutes = Math.floor(time / 60);
@@ -349,6 +361,10 @@ function ResultContent() {
       durationSeconds: time,
       focusRatio,
       avgBpm,
+      validMinutes,
+      rankingScore,
+      highFocusSeconds: jobResult?.highFocusSeconds,
+      rankingEligible,
     };
 
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -364,7 +380,7 @@ function ResultContent() {
     ].slice(0, 30);
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSessions));
-  }, [avgBpm, focusRatio, sessionId, shouldShowReport, time]);
+  }, [avgBpm, focusRatio, jobResult?.highFocusSeconds, rankingEligible, rankingScore, sessionId, shouldShowReport, time, validMinutes]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white">
@@ -430,7 +446,7 @@ function ResultContent() {
         {shouldShowReport && (
           <>
         {/* 핵심 지표 3개 */}
-        <div className="mb-12 grid gap-6 lg:grid-cols-3">
+        <div className="mb-12 grid gap-6 lg:grid-cols-4">
           {/* 학습 시간 */}
           <div className="rounded-2xl bg-gradient-to-br from-cyan-900/30 to-slate-900/70 p-8 ring-1 ring-cyan-500/20 backdrop-blur-sm">
             <div className="flex items-start justify-between">
@@ -470,6 +486,19 @@ function ResultContent() {
                 <p className="mt-1 text-xs text-slate-500">학습 중 집중 유지</p>
               </div>
               <div className="text-5xl opacity-20">🎯</div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-900/30 to-slate-900/70 p-8 ring-1 ring-emerald-500/20 backdrop-blur-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wider text-slate-400">랭킹 점수</p>
+                <p className="mt-2 text-4xl font-bold text-emerald-300">{formatNumber(rankingScore)}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {rankingEligible ? `${validMinutes}분 유효 측정` : '10분 미만 랭킹 제외'}
+                </p>
+              </div>
+              <div className="text-3xl font-black text-emerald-300/20">TOP</div>
             </div>
           </div>
         </div>
@@ -592,6 +621,12 @@ function ResultContent() {
 
         {/* 버튼 */}
         <div className="mt-8 flex gap-4 justify-end">
+          <button
+            onClick={() => router.push('/ranking')}
+            className="rounded-lg border border-emerald-500/50 px-6 py-3 font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+          >
+            랭킹 보기
+          </button>
           <button
             onClick={() => router.push('/dashboard')}
             className="rounded-lg border border-slate-600 px-6 py-3 font-semibold text-slate-200 transition hover:bg-slate-800"

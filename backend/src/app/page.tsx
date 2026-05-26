@@ -127,6 +127,12 @@ export default function HomePage() {
               Dashboard
             </button>
             <button
+              onClick={() => router.push('/ranking')}
+              className="rounded-lg border border-emerald-500/50 px-6 py-3 font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+            >
+              Ranking
+            </button>
+            <button
               onClick={() => router.push('/room')}
               className="rounded-lg bg-cyan-600 px-6 py-3 font-semibold shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-500 hover:shadow-cyan-400/40"
             >
