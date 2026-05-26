@@ -64,6 +64,9 @@ jobs:
       - name: Terraform Fmt
         run: terraform fmt -check -diff -recursive
 
+      - name: Clean Terraform Plugins
+        run: rm -rf .terraform
+
       - name: Terraform Init
         run: terraform init
 
