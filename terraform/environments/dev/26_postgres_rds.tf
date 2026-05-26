@@ -30,10 +30,10 @@ resource "aws_db_instance" "postgres" {
   username                    = var.postgres_master_username
   manage_master_user_password = true # RDS 마스터 비밀번호는 랜덤으로 만들고, Secrets Manager에 저장, RDS와 연결해서 관리
 
-  allocated_storage = var.postgres_allocated_storage
+  allocated_storage     = var.postgres_allocated_storage
   max_allocated_storage = var.max_allocated_storage
-  storage_type      = "gp3"
-  storage_encrypted = true
+  storage_type          = "gp3"
+  storage_encrypted     = true
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.db_sg.id]

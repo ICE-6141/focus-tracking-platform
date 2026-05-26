@@ -55,7 +55,7 @@ resource "aws_lb_listener" "prod_https" {
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   # 핵심: validation 끝난 cert ARN 참조 (그래야 cert 검증 → listener 순서가 보장됨)
-  certificate_arn   = aws_acm_certificate_validation.main.certificate_arn
+  certificate_arn = aws_acm_certificate_validation.main.certificate_arn
 
   default_action {
     type             = "forward"

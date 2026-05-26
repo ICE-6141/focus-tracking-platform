@@ -3,7 +3,7 @@
 ##############################################
 resource "aws_s3_bucket" "logs" {
   bucket        = "${var.project_name}-${var.environment}-logs"
-  force_destroy = true   # destroy 시 안에 파일 있어도 삭제 가능 (졸작 편의)
+  force_destroy = true # destroy 시 안에 파일 있어도 삭제 가능 (졸작 편의)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-logs"
@@ -155,7 +155,7 @@ resource "aws_iam_role_policy" "flow_log" {
 resource "aws_flow_log" "main" {
   iam_role_arn    = aws_iam_role.flow_log.arn
   log_destination = aws_cloudwatch_log_group.vpc_flow.arn
-  traffic_type    = "REJECT"   # ACCEPT는 너무 많음. REJECT만 기록.
+  traffic_type    = "REJECT" # ACCEPT는 너무 많음. REJECT만 기록.
   vpc_id          = aws_vpc.main_vpc.id
 
   tags = {

@@ -113,9 +113,9 @@ resource "aws_autoscaling_group" "app" {
   name = "${var.project_name}-${var.environment}-app-asg"
 
   # 인스턴스 개수 정책
-  min_size         = 1   # 절대 0으로 안 내려감 (항상 EC2 1대 유지)
-  max_size         = 2   # ENI 제약 + 비용 상한
-  desired_capacity = 1   # 평소 목표치 (Capacity Provider가 자동 조정)
+  min_size         = 1 # 절대 0으로 안 내려감 (항상 EC2 1대 유지)
+  max_size         = 2 # ENI 제약 + 비용 상한
+  desired_capacity = 1 # 평소 목표치 (Capacity Provider가 자동 조정)
 
   # AZ 분산: 두 서브넷 등록 → ASG가 자동으로 분산 배치
   # desired=1일 땐 둘 중 한 곳에만 띄움, desired=2일 땐 양쪽에 1대씩 분산
@@ -137,7 +137,7 @@ resource "aws_autoscaling_group" "app" {
 
   # 헬스체크: EC2 자체 상태만 확인 (Task 상태는 ECS Service가 관리)
   health_check_type         = "EC2"
-  health_check_grace_period = 300   # EC2 부팅 후 5분간 헬스체크 유예 (ECS 등록 시간 확보)
+  health_check_grace_period = 300 # EC2 부팅 후 5분간 헬스체크 유예 (ECS 등록 시간 확보)
 
   # Capacity Provider가 desired_capacity를 자동 조정하므로
   # Terraform이 되돌리지 않도록 무시
@@ -225,7 +225,7 @@ resource "aws_ecs_cluster_capacity_providers" "app" {
 
   default_capacity_provider_strategy {
     capacity_provider = aws_ecs_capacity_provider.app.name
-    weight            = 100   # 100% 이 Provider로 배치
-    base              = 1     # 최소 1개 Task는 무조건 이 Provider에
+    weight            = 100 # 100% 이 Provider로 배치
+    base              = 1   # 최소 1개 Task는 무조건 이 Provider에
   }
 }

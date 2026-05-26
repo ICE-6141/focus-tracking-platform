@@ -5,8 +5,8 @@
 resource "aws_ecr_repository" "app" {
 
   # 레포지토리 이름
-  name = "${var.project_name}-repo" 
-  
+  name = "${var.project_name}-repo"
+
   # MUTABLE은 같은 태그로 이미지를 여러 번 덮어씌울 수 있게 해줌
   # 개발 단계에서는 편의를 위해 보통 MUTABLE을 사용해.
   image_tag_mutability = "MUTABLE"
@@ -38,9 +38,9 @@ resource "aws_ecr_lifecycle_policy" "app_policy" {
       rulePriority = 1
       description  = "최근 업로드된 5개의 이미지만 남기고 나머지는 자동으로 삭제함"
       selection = {
-        tagStatus     = "any"                # 태그가 있든 없든 모든 이미지 대상
-        countType     = "imageCountMoreThan" # 개수가 넘어가면 작동
-        countNumber   = 5                    # 기준값은 5개
+        tagStatus   = "any"                # 태그가 있든 없든 모든 이미지 대상
+        countType   = "imageCountMoreThan" # 개수가 넘어가면 작동
+        countNumber = 5                    # 기준값은 5개
       }
       action = {
         type = "expire" # 삭제
@@ -54,7 +54,7 @@ resource "aws_ecr_lifecycle_policy" "app_policy" {
 #############################
 
 resource "aws_ecr_repository" "ml_service" {
-  name = "${var.project_name}-ml-service-repo"
+  name                 = "${var.project_name}-ml-service-repo"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
@@ -80,9 +80,9 @@ resource "aws_ecr_lifecycle_policy" "ml_service_policy" {
       rulePriority = 1
       description  = "최근 업로드된 5개의 이미지만 남기고 나머지는 자동으로 삭제함"
       selection = {
-        tagStatus     = "any"
-        countType     = "imageCountMoreThan"
-        countNumber   = 5
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 5
       }
       action = {
         type = "expire"
