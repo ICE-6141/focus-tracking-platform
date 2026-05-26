@@ -29,10 +29,10 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   namespace           = "AWS/ApplicationELB"
   period              = 60
   statistic           = "Sum"
-  threshold           = 10        # 1분 동안 5xx 10개 이상
+  threshold           = 10 # 1분 동안 5xx 10개 이상
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
+  alarm_actions      = [aws_sns_topic.alerts.arn]
+  ok_actions         = [aws_sns_topic.alerts.arn]
   treat_missing_data = "notBreaching"
 
   dimensions = {
@@ -54,8 +54,8 @@ resource "aws_cloudwatch_metric_alarm" "ecs_task_count" {
   statistic           = "Average"
   threshold           = 1
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
+  alarm_actions      = [aws_sns_topic.alerts.arn]
+  ok_actions         = [aws_sns_topic.alerts.arn]
   treat_missing_data = "breaching"
 
   dimensions = {
@@ -99,9 +99,9 @@ resource "aws_cloudwatch_metric_alarm" "alb_latency" {
   namespace           = "AWS/ApplicationELB"
   period              = 60
   statistic           = "Average"
-  threshold           = 2          # 2초
+  threshold           = 2 # 2초
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
+  alarm_actions      = [aws_sns_topic.alerts.arn]
   treat_missing_data = "notBreaching"
 
   dimensions = {
@@ -124,15 +124,15 @@ resource "aws_cloudwatch_metric_alarm" "ec2_credit_balance_low" {
   alarm_name          = "${var.project_name}-${var.environment}-ec2-cpu-credit-low"
   alarm_description   = "ASG EC2의 CPU 크레딧 잔량 50개 미만 (곧 throttle 위험)"
   comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 3      # 3번 연속 임계 미달 시 알람 (오탐 방지)
+  evaluation_periods  = 3 # 3번 연속 임계 미달 시 알람 (오탐 방지)
   metric_name         = "CPUCreditBalance"
   namespace           = "AWS/EC2"
-  period              = 300    # 5분 간격 측정
+  period              = 300 # 5분 간격 측정
   statistic           = "Average"
-  threshold           = 50     # 크레딧 50개 미만 = 약 2시간 풀로드 가능 분량
+  threshold           = 50 # 크레딧 50개 미만 = 약 2시간 풀로드 가능 분량
 
-  alarm_actions = [aws_sns_topic.alerts.arn]
-  ok_actions    = [aws_sns_topic.alerts.arn]
+  alarm_actions      = [aws_sns_topic.alerts.arn]
+  ok_actions         = [aws_sns_topic.alerts.arn]
   treat_missing_data = "notBreaching"
 
   # ASG의 모든 EC2 인스턴스에 대해 자동으로 적용됨

@@ -23,11 +23,11 @@ resource "aws_appautoscaling_target" "ecs_service" {
   scalable_dimension = "ecs:service:DesiredCount"
 
   # 어떤 Service를 스케일할지 지정 (cluster/service-name 형식)
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  resource_id = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
 
   # Task 개수 범위
-  min_capacity = 1   # 최소 1개 (절대 0 안 됨)
-  max_capacity = 2   # 최대 2개 (1 EC2당 ENI 2개 한계 = 1 EC2에 2 Task)
+  min_capacity = 1 # 최소 1개 (절대 0 안 됨)
+  max_capacity = 2 # 최대 2개 (1 EC2당 ENI 2개 한계 = 1 EC2에 2 Task)
 
   tags = {
     Name = "${var.project_name}-${var.environment}-ecs-asg-target"
@@ -43,8 +43,8 @@ resource "aws_appautoscaling_target" "ecs_service" {
 # - 평균이 55% 위로 가면 → Task 늘림
 # - 평균이 55% 아래로 한참 가면 → Task 줄임
 resource "aws_appautoscaling_policy" "ecs_cpu" {
-  name               = "${var.project_name}-${var.environment}-cpu-target-tracking"
-  policy_type        = "TargetTrackingScaling"
+  name        = "${var.project_name}-${var.environment}-cpu-target-tracking"
+  policy_type = "TargetTrackingScaling"
 
   # 위에서 등록한 Scalable Target을 참조 (반복 입력 방지)
   resource_id        = aws_appautoscaling_target.ecs_service.resource_id

@@ -50,13 +50,13 @@ resource "aws_kinesis_firehose_delivery_stream" "ecs_logs_to_s3" {
   destination = "extended_s3"
 
   extended_s3_configuration {
-    role_arn   = aws_iam_role.firehose.arn
-    bucket_arn = aws_s3_bucket.logs.arn
-    prefix     = "ecs/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
+    role_arn            = aws_iam_role.firehose.arn
+    bucket_arn          = aws_s3_bucket.logs.arn
+    prefix              = "ecs/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/"
     error_output_prefix = "ecs-errors/"
 
-    buffering_size     = 5    # 5MB 모이면 flush
-    buffering_interval = 300  # 또는 5분마다
+    buffering_size     = 5   # 5MB 모이면 flush
+    buffering_interval = 300 # 또는 5분마다
     compression_format = "GZIP"
 
     cloudwatch_logging_options {
@@ -114,7 +114,7 @@ resource "aws_iam_role_policy" "cw_to_firehose" {
 resource "aws_cloudwatch_log_subscription_filter" "ecs_to_firehose" {
   name            = "${var.project_name}-${var.environment}-ecs-to-firehose"
   log_group_name  = aws_cloudwatch_log_group.app.name
-  filter_pattern  = ""   # 모든 로그
+  filter_pattern  = "" # 모든 로그
   destination_arn = aws_kinesis_firehose_delivery_stream.ecs_logs_to_s3.arn
   role_arn        = aws_iam_role.cw_to_firehose.arn
 }
