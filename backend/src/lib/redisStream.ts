@@ -283,6 +283,10 @@ export interface TrackingAnalysisJobStatus {
     durationSeconds?: number;
     avgBpm?: number;
     focusRatio?: number;
+    validMinutes?: number;
+    rankingScore?: number;
+    highFocusSeconds?: number;
+    rankingEligible?: boolean;
     summary?: string;
     feedback?: string;
     feedback2?: string;
@@ -292,6 +296,28 @@ export interface TrackingAnalysisJobStatus {
   };
   error?: string;
 }
+
+export interface RankingSessionEntry {
+  id: string;
+  jobId: string;
+  sessionId: string;
+  streamUserId: string;
+  userId: string;
+  userName: string;
+  userAvatarUrl?: string;
+  page: 'solo' | 'room';
+  completedAt: string;
+  durationSeconds: number;
+  validMinutes: number;
+  avgBpm?: number;
+  focusRatio: number;
+  rankingScore: number;
+  highFocusSeconds: number;
+  rankingEligible: boolean;
+}
+
+const RANKING_SESSION_INDEX_KEY = 'tracking:ranking:sessions';
+const RANKING_ENTRY_TTL_SECONDS = 60 * 60 * 24 * 370;
 
 function makeJobId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -350,4 +376,47 @@ export async function getTrackingAnalysisJobStatus(jobId: string) {
   } catch {
     return null;
   }
+}
+
+export async function upsertRankingSessionEntry(entry: RankingSessionEntry) {
+  const key = `tracking:ranking:session:${entry.id}`;
+
+  await sendRedisCommand([
+    'SET',
+    key,
+    JSON.stringify(entry),
+    'EX',
+    String(RANKING_ENTRY_TTL_SECONDS),
+  ]);
+  await sendRedisCommand(['SADD', RANKING_SESSION_INDEX_KEY, key]);
+
+  return { key };
+}
+
+export async function getRankingSessionEntries() {
+  const rawKeys = await sendRedisCommand(['SMEMBERS', RANKING_SESSION_INDEX_KEY]);
+  if (!Array.isArray(rawKeys)) return [];
+
+  const keys = rawKeys.filter((key): key is string => typeof key === 'string');
+  if (keys.length === 0) return [];
+
+  const entries: RankingSessionEntry[] = [];
+  const chunkSize = 100;
+  for (let index = 0; index < keys.length; index += chunkSize) {
+    const chunk = keys.slice(index, index + chunkSize);
+    const rawValues = await sendRedisCommand(['MGET', ...chunk]);
+    if (!Array.isArray(rawValues)) continue;
+
+    for (const rawValue of rawValues) {
+      if (typeof rawValue !== 'string') continue;
+      try {
+        const entry = JSON.parse(rawValue) as RankingSessionEntry;
+        if (entry.id && typeof entry.rankingScore === 'number') entries.push(entry);
+      } catch {
+        // Ignore malformed historical ranking entries.
+      }
+    }
+  }
+
+  return entries;
 }

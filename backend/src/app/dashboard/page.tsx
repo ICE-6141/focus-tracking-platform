@@ -188,6 +188,12 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap gap-3">
             <button
+              onClick={() => router.push('/ranking')}
+              className="h-10 rounded-md border border-emerald-500/50 px-4 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/10"
+            >
+              랭킹
+            </button>
+            <button
               onClick={() => router.push('/')}
               className="h-10 rounded-md border border-slate-700 px-4 text-sm font-semibold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900"
             >
@@ -338,12 +344,13 @@ export default function DashboardPage() {
 
               <div className="mt-5 overflow-hidden rounded-lg border border-slate-800">
                 {selectedSessions.length > 0 ? (
-                  <table className="w-full min-w-[520px] text-left text-sm">
+                  <table className="w-full min-w-[620px] text-left text-sm">
                     <thead className="bg-slate-950 text-xs uppercase text-slate-500">
                       <tr>
                         <th className="px-4 py-3">일시</th>
                         <th className="px-4 py-3">학습 시간</th>
                         <th className="px-4 py-3">집중도</th>
+                        <th className="px-4 py-3">랭킹 점수</th>
                         <th className="px-4 py-3">평균 BPM</th>
                       </tr>
                     </thead>
@@ -353,6 +360,7 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-slate-300">{formatDate(session.createdAt)}</td>
                           <td className="px-4 py-3 text-slate-300">{formatDuration(session.durationSeconds)}</td>
                           <td className="px-4 py-3 font-semibold text-emerald-300">{session.focusRatio}%</td>
+                          <td className="px-4 py-3 font-semibold text-cyan-300">{session.rankingScore ?? '--'}</td>
                           <td className="px-4 py-3 font-semibold text-rose-300">{session.avgBpm || '--'}</td>
                         </tr>
                       ))}
@@ -378,12 +386,13 @@ export default function DashboardPage() {
 
           {recentSessions.length > 0 ? (
             <div className="overflow-hidden rounded-lg border border-slate-800">
-              <table className="w-full min-w-[640px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-slate-950 text-xs uppercase text-slate-500">
                   <tr>
                     <th className="px-4 py-3">일시</th>
                     <th className="px-4 py-3">학습 시간</th>
                     <th className="px-4 py-3">집중도</th>
+                    <th className="px-4 py-3">랭킹 점수</th>
                     <th className="px-4 py-3">평균 BPM</th>
                   </tr>
                 </thead>
@@ -393,6 +402,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-3 text-slate-300">{formatDate(session.createdAt)}</td>
                       <td className="px-4 py-3 text-slate-300">{formatDuration(session.durationSeconds)}</td>
                       <td className="px-4 py-3 font-semibold text-emerald-300">{session.focusRatio}%</td>
+                      <td className="px-4 py-3 font-semibold text-cyan-300">{session.rankingScore ?? '--'}</td>
                       <td className="px-4 py-3 font-semibold text-rose-300">{session.avgBpm || '--'}</td>
                     </tr>
                   ))}

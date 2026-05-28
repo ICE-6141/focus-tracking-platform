@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const SESSION_COOKIE = 'focus_session';
-const protectedPaths = ['/', '/dashboard', '/result', '/room', '/tracker'];
+const protectedPaths = ['/', '/dashboard', '/ranking', '/result', '/room', '/tracker'];
 
 const base64UrlToBytes = (value: string) => {
   const base64 = value.replace(/-/g, '+').replace(/_/g, '/');

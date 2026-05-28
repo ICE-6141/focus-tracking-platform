@@ -118,6 +118,10 @@ class ResultMetrics(BaseModel):
     duration_seconds: int
     avg_bpm: Optional[int] = None
     focus_ratio: Optional[int] = None
+    valid_minutes: float
+    ranking_score: Optional[float] = None
+    high_focus_seconds: int
+    ranking_eligible: bool
 
 
 class GazeHeatmapCell(BaseModel):
