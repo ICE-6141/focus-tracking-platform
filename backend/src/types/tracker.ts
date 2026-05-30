@@ -7,9 +7,6 @@ export interface PairingData {
   heartRate: number;
   updatedAt: number;
   appleWatchPaired?: boolean;
-  focusScore?: number | null;
-  focusThreshold?: number | null;
-  focusIsFocused?: boolean | null;
 }
 
 export interface PairingResponse {

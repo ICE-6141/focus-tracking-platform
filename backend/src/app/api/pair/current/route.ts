@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * 사용자의 활성 페어링 + 라이브 메트릭 조회.
  *
  * 응답 형식 (호환):
- *   페어링 활성   → { status:'active', heartRate, focusScore?, focusThreshold?, focusIsFocused?, ... }
+ *   페어링 활성   → { status:'active', heartRate, ... }
  *   페어링 없음   → 200 + { active:false }
  *   미인증        → 401 + { active:false }
  *
@@ -39,8 +39,5 @@ export async function GET() {
     appleWatchPaired: pairing?.appleWatchPaired === 'true'
       || liveMetrics?.heartRateSource === 'Apple Watch',
     heartRate: liveMetrics?.heartRate ?? 0,
-    focusScore: liveMetrics?.focusScore ?? null,
-    focusThreshold: liveMetrics?.focusThreshold ?? null,
-    focusIsFocused: liveMetrics?.focusIsFocused ?? null,
   });
 }

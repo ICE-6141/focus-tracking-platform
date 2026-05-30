@@ -11,11 +11,6 @@ import { useMinuteHeartRateAverages } from '@/hooks/useMinuteHeartRateAverages';
 import { useRollingHeartRateAverage } from '@/hooks/useRollingHeartRateAverage';
 import type { HeartRateSourcePreference, PairingData, PairingResponse } from '@/types/tracker';
 
-function formatMetric(value: number | null | undefined, digits = 3) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
-  return Number.isInteger(value) ? String(value) : value.toFixed(digits);
-}
-
 export default function TrackerPage() {
   const router = useRouter();
   const [code, setCode] = useState<string>('');
@@ -25,21 +20,10 @@ export default function TrackerPage() {
   const [heartRateSourcePreference, setHeartRateSourcePreference] = useState<HeartRateSourcePreference>('webcam');
 
   const isPaired = !!data && data.status === 'active';
-  const hasAppleWatchValues = isPaired && (
-    (data?.heartRate ?? 0) > 0
-    || typeof data?.focusScore === 'number'
-    || typeof data?.focusThreshold === 'number'
-  );
+  const hasAppleWatchValues = isPaired && (data?.heartRate ?? 0) > 0;
   const hasAppleWatchConnection = isPaired && (data?.appleWatchPaired === true || hasAppleWatchValues);
   const useAppleWatchMode = heartRateSourcePreference === 'apple-watch';
   const useRPPGMode = heartRateSourcePreference === 'webcam';
-  const appleWatchFocusIsFocused = data?.focusIsFocused ?? (
-    typeof data?.focusScore === 'number' && typeof data?.focusThreshold === 'number'
-      ? data.focusScore >= data.focusThreshold
-      : null
-  );
-  const focusStatus = appleWatchFocusIsFocused == null ? '판정 대기' : appleWatchFocusIsFocused ? '집중 중' : '집중 저하';
-
   const { bpm, confidence, status: rppgStatus } = useRPPG('webgazerVideoFeed', useRPPGMode);
   const rawDisplayedHeartRate = useAppleWatchMode ? data?.heartRate ?? 0 : bpm;
   const heartRateAverageSource = useAppleWatchMode ? 'Apple Watch' : 'FacePhys Camera';
@@ -186,24 +170,15 @@ export default function TrackerPage() {
                 <p className="text-sm font-medium" style={{ color: 'var(--color-brand-700)' }}>Apple Watch 연결됨</p>
                 {hasAppleWatchValues ? (
                   <>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="mt-3 grid grid-cols-1 gap-2 text-center">
                       <div className="rounded-md bg-white px-2 py-2">
                         <p className="text-xl font-medium" style={{ color: 'var(--color-brand-900)' }}>{displayedHeartRate || '--'}</p>
                         <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>bpm</p>
                       </div>
-                      <div className="rounded-md bg-white px-2 py-2">
-                        <p className="text-xl font-medium" style={{ color: 'var(--color-brand-900)' }}>{formatMetric(data?.focusScore)}</p>
-                        <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Score</p>
-                      </div>
-                      <div className="rounded-md bg-white px-2 py-2">
-                        <p className="text-xl font-medium" style={{ color: 'var(--color-brand-900)' }}>{formatMetric(data?.focusThreshold)}</p>
-                        <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Limit</p>
-                      </div>
                     </div>
-                    <p className="mt-2 text-xs" style={{ color: 'var(--color-text-soft)' }}>집중 상태: {focusStatus}</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-xs" style={{ color: 'var(--color-text-soft)' }}>심박수와 집중 점수를 기다리는 중...</p>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--color-text-soft)' }}>Apple Watch BPM을 기다리는 중...</p>
                 )}
               </div>
             )}
