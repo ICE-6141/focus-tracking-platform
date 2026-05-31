@@ -17,6 +17,7 @@ const presenceKey = (roomId: string, userId: string) =>
   `presence:room:${roomId}:user:${userId}`;
 const presenceSetKey = (roomId: string) => `presence:room:${roomId}:members`;
 const metricsKey = (userId: string) => `metrics:live:user:${userId}`;
+const watchMetricsKey = (userId: string) => `metrics:watch:user:${userId}`;
 const signalsKey = (roomId: string) => `signals:room:${roomId}`;
 
 export interface PresencePayload {
@@ -92,10 +93,18 @@ export interface LiveMetricsPayload {
   gazeY: number;
   heartRate: number;
   heartRateSource: string;
+  appleWatchHeartRate?: number;
+  heartRateDifferenceBpm?: number | null;
+  heartRateReliabilityScore?: number | null;
   focusScore: number;
   focusSource?: string;
   focusThreshold?: number | null;
   focusIsFocused?: boolean | null;
+  updatedAt: number;
+}
+
+export interface WatchHeartRatePayload {
+  heartRate: number;
   updatedAt: number;
 }
 
@@ -114,6 +123,26 @@ export async function getLiveMetrics(
   if (typeof reply !== 'string') return null;
   try {
     return JSON.parse(reply) as LiveMetricsPayload;
+  } catch {
+    return null;
+  }
+}
+
+export async function setWatchHeartRate(
+  userId: string,
+  payload: WatchHeartRatePayload,
+): Promise<void> {
+  const key = watchMetricsKey(userId);
+  await sendRedisCommand(['SET', key, JSON.stringify(payload), 'EX', String(METRICS_TTL_SECONDS)]);
+}
+
+export async function getWatchHeartRate(
+  userId: string,
+): Promise<WatchHeartRatePayload | null> {
+  const reply = await sendRedisCommand(['GET', watchMetricsKey(userId)]);
+  if (typeof reply !== 'string') return null;
+  try {
+    return JSON.parse(reply) as WatchHeartRatePayload;
   } catch {
     return null;
   }
