@@ -48,6 +48,7 @@ export async function snapshotRoom(input: RoomWithMembers): Promise<RoomSnapshot
           gazeY: metrics.gazeY,
           heartRate: metrics.heartRate,
           heartRateSource: metrics.heartRateSource,
+          appleWatchHeartRate: metrics.appleWatchHeartRate,
           focusScore: metrics.focusScore,
           focusSource: metrics.focusSource,
           focusThreshold: metrics.focusThreshold,

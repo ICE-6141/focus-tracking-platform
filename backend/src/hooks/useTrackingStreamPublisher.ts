@@ -7,6 +7,7 @@ interface TrackingStreamData {
   heartRate: number;
   heartRateSource: string;
   heartRateStatus?: string;
+  appleWatchHeartRate?: number;
   gazeX: number;
   gazeY: number;
   rawGazeX?: number;
@@ -61,6 +62,7 @@ function buildPayload(latest: TrackingStreamData, paused: boolean) {
     heartRate: latest.heartRate,
     heartRateSource: latest.heartRateSource,
     heartRateStatus: latest.heartRateStatus,
+    appleWatchHeartRate: latest.appleWatchHeartRate,
     gaze: {
       x: latest.gazeX,
       y: latest.gazeY,

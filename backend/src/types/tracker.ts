@@ -1,7 +1,5 @@
 // src/types/tracker.ts
 
-export type HeartRateSourcePreference = 'webcam' | 'apple-watch';
-
 export interface PairingData {
   status: 'waiting' | 'active';
   heartRate: number;
@@ -21,6 +19,7 @@ export interface FocusMetrics {
   gazeY: number;
   heartRate: number;
   heartRateSource: string;
+  appleWatchHeartRate?: number;
   focusScore: number;
   focusSource?: string;
   focusThreshold?: number | null;
