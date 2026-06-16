@@ -326,7 +326,8 @@ data "aws_iam_policy_document" "github_actions_permissions_policy_document_2" {
       "s3:PutLifecycleConfiguration", "s3:GetLifecycleConfiguration",
       "s3:PutBucketLogging",
       "s3:PutBucketTagging",
-      "s3:PutObject",
+      # force_destroy 로 버킷을 비울 때 객체와 버전을 모두 지워야 한다 (versioning 활성화 버킷)
+      "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion",
     ]
 
     resources = ["*"]
