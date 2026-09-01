@@ -85,7 +85,7 @@ iPhone에서 발급한 6자리 페어링 코드로 Apple Watch 심박수를 브�
 
 ## 아키텍처 개요
 
-서울 리전(`ap-northeast-2`)의 2-AZ VPC 위에 **ECS Fargate(앱) + EC2(ML/Redis) + RDS PostgreSQL** 로 구성되어 있습니다.
+서울 리전(`ap-northeast-2`)의 2-AZ VPC 위에 **ECS Fargate(앱) + EC2(분석/Redis) + RDS PostgreSQL** 로 구성되어 있습니다.
 인프라 상세(서브넷·보안그룹·배포·관측성)와 전체 다이어그램은 **[인프라 문서 → `terraform/README.md`](terraform/README.md)** 를 참고하세요.
 
 ```mermaid
@@ -101,9 +101,9 @@ flowchart LR
         next["Next.js 앱<br/>프론트엔드 + API :3000<br/>FacePhys ONNX 추론"]
     end
 
-    subgraph datat["ML / 데이터"]
-        fastapi["FastAPI ML 서비스<br/>(EC2) :8000"]
-        redis[("Redis :6379<br/>실시간 추적 스트림")]
+    subgraph datat["분석 / 데이터"]
+        fastapi["FastAPI 분석 서비스<br/>(EC2) :8000"]
+        redis[("Redis :6379<br/>실시간 추적 스트림<br/>(같은 EC2의 컨테이너)")]
         rds[("PostgreSQL<br/>RDS · Multi-AZ")]
     end
 
@@ -124,8 +124,8 @@ sequenceDiagram
     autonumber
     participant B as 브라우저
     participant N as Next.js (Fargate)
-    participant R as Redis (ML EC2)
-    participant M as FastAPI ML (EC2)
+    participant R as Redis (분석 EC2)
+    participant M as FastAPI 분석 (EC2)
     participant D as Bedrock (Claude)
     participant P as PostgreSQL (RDS)
 
@@ -143,6 +143,9 @@ sequenceDiagram
     N-->>B: 대시보드 / 결과 시각화
 ```
 
+> 앱과 분석 서비스는 두 경로로 연결됩니다 — **초 단위 추적 데이터는 Redis Streams로 전달**하고,
+> **분석 요청은 `POST /analyze` REST 호출**로 보냅니다.
+
 ---
 
 ## 기술 스택
@@ -159,7 +162,9 @@ sequenceDiagram
 | 캐시/스트림 | Redis (실시간 추적 데이터, Redis Streams) |
 | 인증 | Google OAuth 2.0 |
 
-### ML 분석 서비스 (`ml-service/` · Python)
+### 분석 서비스 (`ml-service/` · Python)
+
+집중도 산출은 학습된 모델이 아니라 **심박변이도(HRV) 지표 기반 규칙**으로 계산합니다.
 
 | 영역 | 사용 기술 |
 | --- | --- |
@@ -172,7 +177,7 @@ sequenceDiagram
 
 | 영역 | 사용 기술 |
 | --- | --- |
-| 컨테이너 오케스트레이션 | **AWS ECS Fargate** (앱), EC2(ML 서비스 + Redis) |
+| 컨테이너 오케스트레이션 | **AWS ECS Fargate** (앱), EC2(분석 서비스 + Redis) |
 | 로드밸런싱/DNS/TLS | ALB, Route 53, ACM |
 | 데이터베이스 | RDS for PostgreSQL (Multi-AZ) |
 | 레지스트리/배포 | ECR, **CodeDeploy Blue/Green** |
@@ -207,7 +212,7 @@ focus-tracking-platform/
 │   │   ├── main.py              # FastAPI 진입점 (/analyze, /health)
 │   │   ├── inference.py         # 세션 분석 로직
 │   │   ├── preprocessing.py     # 분 단위 피처 가공
-│   │   ├── model.py / params.py # 집중도 모델 · 설정
+│   │   ├── model.py / params.py # 집중도 산출 규칙 · 설정
 │   │   └── llm_feedback.py      # Bedrock(Claude) 피드백 생성
 │   ├── docker-compose.yml       # ml-service + redis
 │   └── Dockerfile
@@ -218,7 +223,7 @@ focus-tracking-platform/
 │   └── environments/dev/        # dev 스택: network 모듈 호출 + 컴퓨팅·배포·관측성
 │
 ├── .github/workflows/           # backend.yml · ml-service.yml · terraform.yml
-├── scripts/                     # checkov.sh(IaC 보안 스캔) · monitoring.sh
+├── scripts/                     # checkov.sh(IaC 보안 스캔 · 수동 실행) · monitoring.sh
 ├── appspec.yaml                 # CodeDeploy(ECS) 정의
 └── README.md
 ```
@@ -237,7 +242,7 @@ focus-tracking-platform/
 ### 1) 저장소 클론
 
 ```bash
-git clone https://github.com/ICE-6141/focus-tracking-platform.git
+git clone https://github.com/kang0225/focus-tracking-platform.git
 cd focus-tracking-platform
 ```
 
@@ -251,7 +256,7 @@ npm run db:migrate     # Drizzle 마이그레이션 (DATABASE_URL 필요)
 npm run dev            # http://localhost:3000
 ```
 
-### 3) ML 서비스 실행
+### 3) 분석 서비스 실행
 
 ```bash
 cd ml-service
@@ -260,8 +265,8 @@ docker compose up -d   # FastAPI(:8000) + Redis(:6379) 동시 기동
 # pip install -r requirements.txt && uvicorn src.main:app --reload
 ```
 
-> ML 서비스의 `/analyze`는 Redis에 쌓인 세션 데이터를 읽어 분석합니다.
-> 백엔드와 ML 서비스가 **같은 Redis** 를 보도록 `REDIS_HOST`/`REDIS_PORT`를 맞춰주세요.
+> 분석 서비스의 `/analyze`는 Redis에 쌓인 세션 데이터를 읽어 분석합니다.
+> 백엔드와 분석 서비스가 **같은 Redis** 를 보도록 `REDIS_HOST`/`REDIS_PORT`를 맞춰주세요.
 
 ---
 
@@ -287,7 +292,7 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_STREAM_MAXLEN=10800
 
-# ML 서비스
+# 분석 서비스
 ML_SERVICE_URL=http://localhost:8000
 
 # WebRTC ICE 서버 — 런타임에 GET /api/rtc/config 로 클라이언트에 제공(미설정 시 STUN 기본값)
@@ -298,7 +303,7 @@ RTC_ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exa
 > 운영 환경에서는 `DB_PASSWORD`를 **Secrets Manager**(RDS 관리형 시크릿)에서 주입하며,
 > 나머지 시크릿은 GitHub Actions Secrets → ECS Task Definition으로 전달됩니다.
 
-### ML 서비스 (Bedrock)
+### 분석 서비스 (Bedrock)
 
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
@@ -326,7 +331,7 @@ RTC_ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exa
 | 랭킹 | `ranking`, `ranking/me` | 집중 랭킹 |
 | 헬스 | `health` | ALB 헬스체크 (`/api/health`) |
 
-### ML 서비스 (FastAPI)
+### 분석 서비스 (FastAPI)
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
@@ -373,7 +378,7 @@ flowchart LR
 | 워크플로 | 트리거 경로 | 동작 |
 | --- | --- | --- |
 | `backend.yml` | `backend/**`, `appspec.yaml` | ARM64 이미지 빌드 → ECR → ECS Task Definition 렌더 → **CodeDeploy Blue/Green** 배포 |
-| `ml-service.yml` | `ml-service/**` | ARM64 이미지 빌드 → ECR → **SSM Run Command** 로 ML EC2에서 `docker compose up` |
+| `ml-service.yml` | `ml-service/**` | ARM64 이미지 빌드 → ECR → **SSM Run Command** 로 분석 EC2에서 `docker compose up` |
 | `terraform.yml` | `terraform/environments/dev/**` | `fmt -check` → `init` → `plan` → `apply`(main) |
 
 > 배포 전략·롤백·인프라 적용 절차는 **[`terraform/README.md`](terraform/README.md)** 에 자세히 정리되어 있습니다.
@@ -383,11 +388,11 @@ flowchart LR
 ## 모니터링
 
 - **CloudWatch Alarms → SNS(이메일)**: ALB 5xx 급증, ECS 실행 Task 부족, ECS CPU 80%↑, ALB 응답시간 2초↑
-- **Datadog → Slack**: ML EC2 스로틀링 위험(CPU 사용률↑ **AND** t4g CPU 크레딧 소진) composite 알림
-- **로그**: ECS 앱 로그(CloudWatch) → Firehose → S3 장기 보관(GZIP, 날짜 파티션), VPC Flow Logs(REJECT), RDS 로그
+- **Datadog → Slack**: 분석 EC2 스로틀링 위험(CPU 사용률↑ **AND** t4g CPU 크레딧 소진) composite 알림
+- **로그**: ECS 앱 로그(CloudWatch) → Firehose → S3 장기 보관(GZIP, 날짜 파티션), VPC Flow Logs(REJECT → CloudWatch), RDS 로그
 - **Datadog**: AWS 통합(메트릭·트레이스·로그 포워딩, CSPM)
 - **ALB Access Logs**: S3 보관(라이프사이클: 30일 후 Glacier IR, 90일 만료)
-- **야간 비용 절감(dev)**: Auto Scaling/EventBridge 스케줄러로 22:00 KST ECS Task·ML EC2 정지 → 09:00 자동 기동
+- **야간 비용 절감(dev)**: Application Auto Scaling Scheduled Action(ECS Task) · EventBridge Scheduler(분석 EC2)로 22:00 KST 정지 → 09:00 자동 기동
 
 ```bash
 # ECS 앱 로그 실시간 확인
