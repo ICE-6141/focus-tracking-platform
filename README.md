@@ -352,8 +352,8 @@ RTC_ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exa
 - **입력**: 36×36×3 RGB 프레임 (15–30 FPS)
 - **출력**: BPM, rPPG 파형, 신호 강도, HRV 지표(PPI·RMSSD·HF)에서 파생한 집중 점수
 - **흐름**: 브라우저 프레임 캡처 → `POST /api/rppg/frame` → ONNX 추론 → BPM · 집중 점수 → 실시간 시각화
-- **집중 점수**: `ln(PPI/100) + ln(rMSSD) + ln(HF)` 원점수를 고/저 집중 이동평균으로 만든 동적 임계값과 비교해 판정하고,
-  점수와 임계값을 Redis Stream에 함께 기록해 분석 서비스가 분 단위로 집계합니다 (`backend/src/lib/facephys/rppg.ts`)
+- **집중 점수**: `ln(PPI/100) + ln(rMSSD) + ln(HF)` 원점수를 고/저 집중 누적 평균(running average)으로 만든 동적 임계값과 비교해 판정하고,
+  점수와 임계값은 `/api/tracking/stream`을 통해 Redis Streams에 기록되며 분석 서비스가 이를 분 단위로 집계합니다 (`backend/src/lib/facephys/rppg.ts`, `backend/src/lib/redisStream.ts`)
 
 ---
 
