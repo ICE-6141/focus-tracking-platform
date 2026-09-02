@@ -13,7 +13,7 @@
 > WebGazer.js 시선 데이터는 이탈률·히트맵으로 함께 분석하며,
 > AWS Bedrock(Claude)으로 학습 습관 피드백까지 제공합니다.
 >
->  **서비스**: [study-room.click](https://study-room.click)
+>  **서비스**: [study-room.click](https://study-room.click) (현재 운영 종료)
 
 <p align="center">
   <img src="docs/screenshots/home-dashboard.png" alt="Focus Tracking 홈 대시보드" width="900">
