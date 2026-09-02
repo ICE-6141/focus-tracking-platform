@@ -9,8 +9,9 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 > **웹캠만으로 학습 집중도를 실시간 분석하는 풀스택 플랫폼.**
-> WebGazer.js 시선 추적과 FacePhys ONNX 기반 원격 심박수 측정(rPPG)을 결합해
-> 분 단위 집중도를 계산하고, AWS Bedrock(Claude)으로 학습 습관 피드백까지 제공합니다.
+> FacePhys ONNX 기반 원격 심박수 측정(rPPG)에서 얻은 PPI·RMSSD·HF로 집중 점수를 산출해 분 단위로 집계하고,
+> WebGazer.js 시선 데이터는 이탈률·히트맵으로 함께 분석하며,
+> AWS Bedrock(Claude)으로 학습 습관 피드백까지 제공합니다.
 >
 >  **서비스**: [study-room.click](https://study-room.click)
 
@@ -44,7 +45,7 @@
 | --- | --- |
 | **실시간 시선 추적** | WebGazer.js 기반 웹캠 시선 감지 + 캘리브레이션, 시선 히트맵 생성 |
 | **원격 심박수 측정 (rPPG)** | FacePhys ONNX 모델로 웹캠 영상에서 BPM 추정 (`onnxruntime-node`, 서버 추론) |
-| **분 단위 집중도 분석** | 시선 이탈률 + 심박/rPPG 추세를 결합해 `focus_score`·집중 상태·추세 산출 |
+| **분 단위 집중도 분석** | rPPG의 PPI·RMSSD·HF로 산출한 `focus_score`를 1분 단위로 집계해 집중 상태·추세 분류 (시선 이탈률·히트맵은 별도 지표로 집계) |
 | **AI 학습 피드백** | 분석 결과를 AWS Bedrock **Claude Sonnet 4.5**로 요약한 자연어 학습 습관 피드백 |
 | **실시간 학습 룸** | WebRTC 시그널링 기반 룸 생성·초대·매칭, 참가자 하트비트 |
 | **랭킹** | 집중 결과 기반 사용자 랭킹 |
@@ -130,12 +131,12 @@ sequenceDiagram
     participant P as PostgreSQL (RDS)
 
     B->>N: 웹캠 프레임(rPPG) + 시선 좌표
-    N->>N: FacePhys ONNX 추론 → BPM
-    N->>R: 초 단위 추적 데이터 기록(Stream)
+    N->>N: FacePhys ONNX 추론 → BPM · PPI/RMSSD/HF → focus score
+    N->>R: 초 단위 추적 데이터(집중 점수·임계값 포함) 기록(Stream)
     Note over B,N: 학습 세션 종료 → 분석 요청
     N->>M: POST /analyze (userId, sessionId)
     M->>R: 세션 기록 조회
-    M->>M: 분 단위 집중도 계산(focus score/state/trend)
+    M->>M: 분 단위 집계 → 집중 상태/추세 분류 · 시선 이탈률/히트맵 산출
     M->>D: 학습 습관 피드백 생성
     D-->>M: 자연어 피드백
     M-->>N: 분석 결과 + 피드백 + 시선 히트맵
@@ -164,7 +165,9 @@ sequenceDiagram
 
 ### 분석 서비스 (`ml-service/` · Python)
 
-집중도 산출은 학습된 모델이 아니라 **심박변이도(HRV) 지표 기반 규칙**으로 계산합니다.
+집중 점수 자체는 앱(Next.js)에서 rPPG의 **PPI·RMSSD·HF** 로 산출하며, 이 서비스는 전달받은 점수를
+**1분 단위로 집계해 집중 상태·추세를 분류**하고 시선 이탈률·히트맵을 계산한 뒤 Bedrock 피드백을 생성합니다.
+학습된 모델은 사용하지 않으며, 디렉터리·리소스 이름은 초기 `ml-service` 명칭을 유지합니다.
 
 | 영역 | 사용 기술 |
 | --- | --- |
@@ -210,9 +213,9 @@ focus-tracking-platform/
 ├── ml-service/                  # Python FastAPI 집중도 분석 — EC2(docker compose) 배포
 │   ├── src/
 │   │   ├── main.py              # FastAPI 진입점 (/analyze, /health)
-│   │   ├── inference.py         # 세션 분석 로직
+│   │   ├── inference.py         # 세션 집계 · 상태/추세 분류 · 히트맵 로직
 │   │   ├── preprocessing.py     # 분 단위 피처 가공
-│   │   ├── model.py / params.py # 집중도 산출 규칙 · 설정
+│   │   ├── model.py / params.py # 집중 상태·추세 분류 규칙 · 설정
 │   │   └── llm_feedback.py      # Bedrock(Claude) 피드백 생성
 │   ├── docker-compose.yml       # ml-service + redis
 │   └── Dockerfile
@@ -336,7 +339,7 @@ RTC_ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exa
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/health` | 헬스체크 |
-| `POST` | `/analyze` | 세션 분 단위 집중도 분석 + (옵션) Bedrock 피드백 |
+| `POST` | `/analyze` | 집중 점수 1분 단위 집계 · 상태/추세 분류 · 시선 히트맵 + (옵션) Bedrock 피드백 |
 | `DELETE` | `/sessions/{user_id}/{session_id}/records` | Redis 세션 기록 삭제 |
 
 ---
@@ -347,8 +350,10 @@ RTC_ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.exa
 
 - **모델**: FacePhys ONNX (`backend/facephys/weights/`), `onnxruntime-node`로 **서버 사이드** 추론
 - **입력**: 36×36×3 RGB 프레임 (15–30 FPS)
-- **출력**: BPM, rPPG 파형, 신호 강도
-- **흐름**: 브라우저 프레임 캡처 → `POST /api/rppg/frame` → ONNX 추론 → BPM → 실시간 시각화
+- **출력**: BPM, rPPG 파형, 신호 강도, HRV 지표(PPI·RMSSD·HF)에서 파생한 집중 점수
+- **흐름**: 브라우저 프레임 캡처 → `POST /api/rppg/frame` → ONNX 추론 → BPM · 집중 점수 → 실시간 시각화
+- **집중 점수**: `ln(PPI/100) + ln(rMSSD) + ln(HF)` 원점수를 고/저 집중 이동평균으로 만든 동적 임계값과 비교해 판정하고,
+  점수와 임계값을 Redis Stream에 함께 기록해 분석 서비스가 분 단위로 집계합니다 (`backend/src/lib/facephys/rppg.ts`)
 
 ---
 
