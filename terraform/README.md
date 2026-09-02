@@ -182,7 +182,7 @@ VPC·서브넷·라우팅·NACL·NAT·S3 엔드포인트는 재사용 가능한 
 - **SSM 관리형**(SSH 미개방) — 배포·운영을 SSM으로 수행
 - `docker compose` 로 **FastAPI(:8000) + Redis(:6379)** 동시 구동
 - IAM: SSM Core + ECR ReadOnly + **Bedrock `InvokeModel`**(Claude Sonnet 4.5)
-- 집중도 산출은 학습된 모델이 아니라 **심박변이도(HRV) 지표 기반 규칙**으로 계산합니다(디렉터리·리소스 이름은 초기 `ml-service` 명칭을 유지).
+- 집중 점수는 앱(Next.js)이 rPPG 지표로 산출해 Redis에 기록하고, 이 서비스는 전달받은 점수를 **1분 단위로 집계해 집중 상태·추세를 분류**하고 시선 히트맵·Bedrock 피드백을 생성합니다(학습된 모델은 사용하지 않으며, 디렉터리·리소스 이름은 초기 `ml-service` 명칭을 유지).
 
 > 구버전 앱 EC2/ASG·Capacity Provider는 Fargate 전환으로 제거되었습니다.
 
